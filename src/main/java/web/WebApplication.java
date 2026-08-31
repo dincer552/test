@@ -14,6 +14,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -21,8 +22,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 public final class WebApplication {
 
@@ -121,7 +125,7 @@ public final class WebApplication {
                   document.getElementById('team').innerHTML =
                     '<b>'+escapeHtml(t.teamName || 'Takım')+'</b><br>Takım ID: '+escapeHtml(t.teamId || '-')+
                     '<br>Kısa ad: '+escapeHtml(t.shortName || '-')+
-                    '<br>Ülke: '+escapeHtml(t.countryName || '-');
+                    '<br>Lig: '+escapeHtml(t.countryName || '-');
                 }).catch(e=>document.getElementById('team').textContent='CHPP verisi alınamadı: '+e);
                 function escapeHtml(s){return String(s).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));}
                 </script></body></html>
@@ -150,17 +154,18 @@ public final class WebApplication {
             }
 
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            Document doc = factory.newDocumentBuilder().parse(
-                    new java.io.ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            Document doc = factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
 
-            org.w3c.dom.Element root = doc.getDocumentElement();
-            String teamId = attr(root, "teamId");
-            String teamName = attr(root, "teamName");
-            String shortName = attr(root, "shortName");
-            String countryName = attr(root, "countryName");
+            String teamId = text(doc, "TeamID");
+            String teamName = text(doc, "TeamName");
+            String shortName = text(doc, "ShortTeamName");
+            String countryName = text(doc, "LeagueName");
 
             String json = "{\"teamId\":\"" + json(teamId) + "\",\"teamName\":\"" + json(teamName)
                     + "\",\"shortName\":\"" + json(shortName) + "\",\"countryName\":\"" + json(countryName) + "\"}";
@@ -172,8 +177,9 @@ public final class WebApplication {
         }
     }
 
-    private static String attr(org.w3c.dom.Element element, String name) {
-        return element.hasAttribute(name) ? element.getAttribute(name) : "";
+    private static String text(Document document, String tagName) {
+        NodeList elements = document.getElementsByTagName(tagName);
+        return elements.getLength() == 0 ? "" : elements.item(0).getTextContent();
     }
 
     private static String json(String value) {
