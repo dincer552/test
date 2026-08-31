@@ -1,0 +1,43 @@
+name: Build Web Dashboard Patch
+
+on:
+  push:
+    branches: [web]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: contains(github.event.head_commit.message, 'HO dashboard patch') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: web
+      - name: Patch dashboard into web app
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/main/java/web/PlayerWebApplicationFixed.java')
+          s=p.read_text(encoding='utf-8')
+          if 'DASHBOARD_V1' in s:
+              raise SystemExit(0)
+          s=s.replace('private static final String PLAYERS="https://chpp.hattrick.org/chppxml.ashx?file=players&version=1.3&actionType=view&orderBy=PlayerNumber";', 'private static final String PLAYERS="https://chpp.hattrick.org/chppxml.ashx?file=players&version=1.3&actionType=view&orderBy=PlayerNumber";\n private static final String TEAM="https://chpp.hattrick.org/chppxml.ashx?file=teamdetails&version=3.0"; // DASHBOARD_V1')
+          s=s.replace('s.createContext("/players",PlayerWebApplicationFixed::page);s.createContext("/api/players",PlayerWebApplicationFixed::api);', 's.createContext("/players",PlayerWebApplicationFixed::page);s.createContext("/dashboard",PlayerWebApplicationFixed::dashboard);s.createContext("/api/players",PlayerWebApplicationFixed::api);s.createContext("/api/team",PlayerWebApplicationFixed::teamApi);')
+          s=s.replace('redirect(e,"/players");', 'redirect(e,"/dashboard");', 1)
+          marker=' private static void page(HttpExchange e)throws IOException{'
+          dash=''' private static void dashboard(HttpExchange e)throws IOException{\n  if(token(e)==null){redirect(e,"/oauth/start");return;}\n  String h="""\n  <!doctype html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n  <title>HO - Genel Bakış</title><style>\n  body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:#f5f7fb;color:#18202a;font-size:13px}main{max-width:1050px;margin:auto;background:#fff;padding:18px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.07)}h1{font-size:22px;margin:0 0 12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.nav a{padding:7px 11px;border-radius:7px;background:#eef2f6;color:#344054;text-decoration:none}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}.card{background:#f7f9fc;border:1px solid #e7e9ee;border-radius:10px;padding:12px}.title{font-weight:700;margin-bottom:8px}.row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid #edf0f4}.row:last-child{border-bottom:0}.label{color:#667085}.value{font-weight:600}.ok{color:#027a48}.muted{color:#667085;font-size:12px}</style></head>\n  <body><main><h1>Genel Bakış</h1><div class="nav"><a href="/dashboard">Genel</a><a href="/players">Oyuncular / Kadro</a></div>\n  <div id="status" class="muted">HO verileri hazırlanıyor...</div><div class="grid">\n  <section class="card"><div class="title">Genel</div><div id="team">Yükleniyor...</div></section>\n  <section class="card"><div class="title">Takım Özeti</div><div id="stats">Yükleniyor...</div></section>\n  </div></main><script>\n  const esc=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));\n  Promise.all([fetch('/api/team').then(r=>r.json()),fetch('/api/players').then(r=>r.json())]).then(([t,p])=>{\n   document.getElementById('team').innerHTML=[['Takım ID',t.teamId],['Takım',t.teamName],['Kısa ad',t.shortName],['Lig',t.league]].map(x=>'<div class="row"><span class="label">'+esc(x[0])+'</span><span class="value">'+esc(x[1]||'-')+'</span></div>').join('');\n   const a=(p.players||[]),nums=a.map(x=>Number(x.tsi)||0),forms=a.map(x=>Number(x.form)||0),exps=a.map(x=>Number(x.experience)||0),ages=a.map(x=>(Number(x.age)||0)+(Number(x.ageDays)||0)/112);\n   const avg=v=>v.length?(v.reduce((a,b)=>a+b,0)/v.length):0;\n   document.getElementById('stats').innerHTML=[['Oyuncu sayısı',a.length],['Toplam TSI',nums.reduce((x,y)=>x+y,0).toLocaleString('tr-TR')],['Ortalama TSI',Math.round(avg(nums)).toLocaleString('tr-TR')],['Ortalama form',avg(forms).toFixed(2)],['Ortalama deneyim',avg(exps).toFixed(2)],['Ortalama yaş',avg(ages).toFixed(2)]].map(x=>'<div class="row"><span class="label">'+esc(x[0])+'</span><span class="value">'+esc(x[1])+'</span></div>').join('');\n   document.getElementById('status').textContent='HO genel bakış verileri yüklendi';document.getElementById('status').className='muted ok';\n  }).catch(e=>{document.getElementById('status').textContent='Veriler alınamadı: '+e.message;});\n  </script></body></html>\n  """;send(e,200,h,"text/html; charset=UTF-8");}\n'''
+          s=s.replace(marker,dash+marker)
+          team=''' private static void teamApi(HttpExchange e)throws IOException{\n  try{OAuth1AccessToken t=token(e);if(t==null){send(e,401,"{\\"error\\":\\"CHPP bağlantısı yok\\"}","application/json; charset=UTF-8");return;}\n  OAuthRequest r=new OAuthRequest(Verb.GET,TEAM);OAuth10aService o=oauth();o.signRequest(t,r);Response z=o.execute(r);\n  if(!z.isSuccessful()){send(e,502,"{\\"error\\":"+js("CHPP API HTTP "+z.getCode())+"}","application/json; charset=UTF-8");return;}\n  Document d=xml(z.getBody());String json="{"+js("teamId")+":"+js(c(d,"TeamID"))+","+js("teamName")+":"+js(c(d,"TeamName"))+","+js("shortName")+":"+js(c(d,"ShortTeamName"))+","+js("league")+":"+js(c(d,"LeagueName"))+"}";send(e,200,json,"application/json; charset=UTF-8");\n  }catch(Exception x){send(e,502,"{\\"error\\":"+js("Takım bilgisi alınamadı: "+x.getMessage())+"}","application/json; charset=UTF-8");}}\n private static String c(Document d,String tag){NodeList n=d.getElementsByTagName(tag);return n.getLength()==0?"":n.item(0).getTextContent();}\n'''
+          s=s.replace(' private static void api(HttpExchange e)throws IOException{',team+' private static void api(HttpExchange e)throws IOException{')
+          s=s.replace("<a href='/players'>Oyuncular / Kadro</a>","<a href='/dashboard'>Genel Bakış</a><a href='/players'>Oyuncular / Kadro</a>")
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/main/java/web/PlayerWebApplicationFixed.java
+          git diff --cached --quiet || git commit -m 'HO dashboard patch'
+          git push origin web
