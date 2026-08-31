@@ -1,0 +1,45 @@
+# analysis performed by akasolace
+
+[general]
+delta                = 0.75
+power                = 1.165
+squareMod            = 0
+cubeMod              = 0
+extraMulti           = 1.000
+trainerOff           = 0.9
+trainerDef           = 1.15
+trainerNeutral       = 1.0
+tacticAIM            = 0.853911
+tacticCreative       = 0.930999
+defleadPercentDef    = 0.0
+pullback             = 0.125
+
+[goalkeeping_allsides]
+keeper    = 0.15555
+
+[defending_allsides]
+keeper      = 0.06375
+
+[defending_thisside]
+CD_norm     = 0.1326
+CD_off      = 0.10200000000000001
+CD_tw       = 0.20655
+WB_norm     = 0.2346
+WB_off      = 0.1887
+WB_tm       = 0.19125
+WB_def      = 0.255
+IM_norm     = 0.04845
+IM_off      = 0.022949999999999998
+IM_def      = 0.06885000000000001
+IM_tw       = 0.0612
+WI_norm     = 0.08925
+WI_off      = 0.056100000000000004
+WI_def      = 0.15555
+WI_tm       = 0.07395
+
+[defending_middle]
+CD_norm     = 0.0663
+CD_off      = 0.051000000000000004
+IM_norm     = 0.022949999999999998
+IM_off      = 0.0102
+IM_def      = 0.0357

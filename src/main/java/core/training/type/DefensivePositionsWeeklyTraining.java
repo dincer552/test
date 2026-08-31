@@ -1,0 +1,45 @@
+package core.training.type;
+
+import core.constants.TrainingType;
+import core.constants.player.PlayerSkill;
+import core.model.player.IMatchRoleID;
+import core.model.player.MatchRoleID;
+import core.training.WeeklyTrainingType;
+
+public class DefensivePositionsWeeklyTraining extends WeeklyTrainingType {
+	protected static DefensivePositionsWeeklyTraining m_ciInstance = null;
+	private DefensivePositionsWeeklyTraining()
+	{
+		_Name = "Defensive Positions";
+		_TrainingType = TrainingType.DEF_POSITIONS;
+		_PrimaryTrainingSkill = PlayerSkill.DEFENDING;
+
+		factorTrainingTypeKoeff = 1.38;
+		osmosisKoeff = 1./6.;
+
+		fullTrainingSectors.add(MatchRoleID.Sector.Goal);
+		fullTrainingSectors.add(MatchRoleID.Sector.Back);
+		fullTrainingSectors.add(MatchRoleID.Sector.CentralDefence);
+		fullTrainingSectors.add(MatchRoleID.Sector.Wing);
+		fullTrainingSectors.add(MatchRoleID.Sector.InnerMidfield);
+
+		osmosisTrainingSectors.add(MatchRoleID.Sector.Forward);
+
+		_PrimaryTrainingSkillPositions = new int[]{ IMatchRoleID.keeper, IMatchRoleID.leftBack,
+				IMatchRoleID.rightBack, IMatchRoleID.leftCentralDefender,
+				IMatchRoleID.middleCentralDefender, IMatchRoleID.rightCentralDefender,
+				IMatchRoleID.rightWinger, IMatchRoleID.leftWinger,
+				IMatchRoleID.leftInnerMidfield, IMatchRoleID.centralInnerMidfield,
+				IMatchRoleID.rightInnerMidfield };
+		_PrimaryTrainingSkillOsmosisTrainingPositions = new int[] { IMatchRoleID.leftForward,
+				IMatchRoleID.centralForward, IMatchRoleID.rightForward};
+		_PrimaryTrainingBaseLength = DefendingWeeklyTraining.instance().getBaseTrainingLength(); // old was (float) 7.2
+//		_PrimaryTrainingSkillBaseLength = (_PrimaryTrainingBaseLength + UserParameter.instance().TRAINING_OFFSET_DEFENDING) * 2;
+	}
+	public static WeeklyTrainingType instance() {
+        if (m_ciInstance == null) {
+        	m_ciInstance = new DefensivePositionsWeeklyTraining();
+        }
+        return m_ciInstance;
+    }
+}

@@ -1,0 +1,236 @@
+package core.db;
+
+import core.model.match.MatchLineupPosition;
+import core.model.enums.MatchType;
+import core.model.player.IMatchRoleID;
+import core.model.series.Paarung;
+import core.util.HOLogger;
+import java.sql.ResultSet;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Vector;
+
+import static core.model.player.IMatchRoleID.*;
+
+public final class MatchLineupPlayerTable extends AbstractTable {
+
+	/**
+	 * tablename
+	 **/
+	public static final String TABLENAME = "MATCHLINEUPPLAYER";
+
+	MatchLineupPlayerTable(ConnectionManager adapter) {
+		super(TABLENAME, adapter);
+		idColumns = 3;
+	}
+
+	@Override
+	protected void initColumns() {
+		columns = new ColumnDescriptor[]{
+				ColumnDescriptor.Builder.newInstance().setColumnName("MatchID").setGetter((o) -> ((MatchLineupPosition) o).getMatchId()).setSetter((o, v) -> ((MatchLineupPosition) o).setMatchId((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("MatchTyp").setGetter((o) -> ((MatchLineupPosition) o).getMatchType().getId()).setSetter((o, v) -> ((MatchLineupPosition) o).setMatchType(MatchType.getById((int) v))).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("TeamID").setGetter((o) -> ((MatchLineupPosition) o).getTeamId()).setSetter((o, v) -> ((MatchLineupPosition) o).setTeamId((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("SpielerID").setGetter((o) -> ((MatchLineupPosition) o).getPlayerId()).setSetter((o, v) -> ((MatchLineupPosition) o).setPlayerId((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("RoleID").setGetter((o) -> ((MatchLineupPosition) o).getRoleId()).setSetter((o, v) -> ((MatchLineupPosition) o).setRoleId((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("Taktik").setGetter((o) -> ((MatchLineupPosition) o).getBehaviour()).setSetter((o, v) -> ((MatchLineupPosition) o).setBehaviour((byte)(int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("VName").setGetter((o) -> ((MatchLineupPosition) o).getSpielerVName()).setSetter((o, v) -> ((MatchLineupPosition) o).setSpielerVName((String) v)).setType(Types.VARCHAR).setLength(255).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("NickName").setGetter((o) -> ((MatchLineupPosition) o).getNickName()).setSetter((o, v) -> ((MatchLineupPosition) o).setNickName((String) v)).setType(Types.VARCHAR).setLength(255).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("Name").setGetter((o) -> ((MatchLineupPosition) o).getSpielerName()).setSetter((o, v) -> ((MatchLineupPosition) o).setSpielerName((String) v)).setType(Types.VARCHAR).setLength(255).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("Rating").setGetter((o) -> ((MatchLineupPosition) o).getRating()).setSetter((o, v) -> ((MatchLineupPosition) o).setRating((float) v)).setType(Types.REAL).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("HoPosCode").setGetter((o) -> ((MatchLineupPosition) o).getHoPosCode()).setSetter((o, v) -> ((MatchLineupPosition) o).setHoPosCode((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("STATUS").setGetter((o) -> ((MatchLineupPosition) o).getStatus()).setSetter((o, v) -> ((MatchLineupPosition) o).setStatus((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("RatingStarsEndOfMatch").setGetter((o) -> ((MatchLineupPosition) o).getRatingStarsEndOfMatch()).setSetter((o, v) -> ((MatchLineupPosition) o).setRatingStarsEndOfMatch((float) v)).setType(Types.REAL).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("StartPosition").setGetter((o) -> ((MatchLineupPosition) o).getStartPosition()).setSetter((o, v) -> ((MatchLineupPosition) o).setStartPosition((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("StartBehaviour").setGetter((o) -> ((MatchLineupPosition) o).getStartBehavior()).setSetter((o, v) -> ((MatchLineupPosition) o).setStartBehavior((int) v)).setType(Types.INTEGER).isNullable(false).build(),
+				ColumnDescriptor.Builder.newInstance().setColumnName("StartSetPieces").setGetter((o) -> ((MatchLineupPosition) o).isStartSetPiecesTaker()).setSetter((o, v) -> ((MatchLineupPosition) o).setStartSetPiecesTaker((Boolean) v)).setType(Types.BOOLEAN).isNullable(true).build()
+		};
+	}
+
+	@Override
+	protected String[] getCreateIndexStatement() {
+		return new String[]{
+				"CREATE INDEX iMATCHLINEUPPLAYER_1 ON " + getTableName() + "(SpielerID)",
+				"CREATE INDEX iMATCHLINEUPPLAYER_2 ON " + getTableName() + "(MatchID,TeamID)",
+				"SET TABLE " + getTableName() + " NEW SPACE"
+		};
+	}
+
+	/**
+	 * Returns a list of ratings the player has played on: 0: Max,  1: Min,  2: Average,  3: posid
+	 */
+	Vector<float[]> getAllRatings(int playerID) {
+		final Vector<float[]> ratings = new Vector<>();
+
+		//Iterate over possible combinations of position / behaviours
+		for (int i : aPositionBehaviours) {
+			final float[] temp = getPlayerRatingForPosition(playerID, i);
+
+			//Min found a value for the pos -> max> 0
+			if (temp[0] > 0) {
+				// Fill in the first value instead of the current value with the posid
+				temp[3] = i;
+				ratings.add(temp);
+			}
+		}
+
+		return ratings;
+	}
+
+	/**
+	 * Gibt die beste, schlechteste und durchschnittliche Bewertung für den Player, sowie die
+	 * Anzahl der Bewertungen zurück // Match
+	 */
+	float[] getBewertungen4Player(int playerId) {
+		//Max, Min, Durchschnitt
+		final float[] bewertungen = {0f, 0f, 0f, 0f};
+
+		try (final ResultSet rs = connectionManager.executePreparedQuery("SELECT MatchID, Rating FROM " + getTableName() + " WHERE SpielerID=?", playerId)) {
+			assert rs != null;
+			int i = 0;
+			while (rs.next()) {
+				float rating = rs.getFloat("Rating");
+				if (rating > -1) {
+					bewertungen[0] = Math.max(bewertungen[0], rating);
+					if (bewertungen[1] == 0) {
+						bewertungen[1] = rating;
+					}
+					bewertungen[1] = Math.min(bewertungen[1], rating);
+					bewertungen[2] += rating;
+					//HOLogger.instance().log(getClass(),rs.getInt("MatchID") + " : " + rating);
+					i++;
+				}
+			}
+
+			if (i > 0) {
+				bewertungen[2] = (bewertungen[2] / i);
+			}
+			bewertungen[3] = i;
+			//HOLogger.instance().log(getClass(),"Ratings     : " + i + " - " + bewertungen[0] + " / " + bewertungen[1] + " / " + bewertungen[2] + " / / " + bewertungen[3]);
+		} catch (Exception e) {
+			HOLogger.instance().log(getClass(), "DatenbankZugriff.getBewertungen4Player : " + e);
+		}
+		return bewertungen;
+	}
+
+	/**
+	 * Returns the best, worst, and average rating for the player, as well as the number of ratings // match
+	 *
+	 * @param playerId Spielerid
+	 * @param position  Usere positionscodierung mit taktik
+	 */
+	float[] getPlayerRatingForPosition(int playerId, int position) {
+		//Max, Min, average
+		final float[] starsStatistics = {0f, 0f, 0f, 0f};
+
+		try (final ResultSet rs = connectionManager.executePreparedQuery("SELECT MatchID, Rating FROM " + getTableName() + " WHERE SpielerID=? AND HoPosCode=?", playerId, position)) {
+			assert rs != null;
+			int i = 0;
+			while (rs.next()) {
+				float rating = rs.getFloat("Rating");
+				if (rating > -1) {
+					starsStatistics[0] = Math.max(starsStatistics[0], rating);
+					if (starsStatistics[1] == 0) {
+						starsStatistics[1] = rating;
+					}
+					starsStatistics[1] = Math.min(starsStatistics[1], rating);
+					starsStatistics[2] += rating;
+					//HOLogger.instance().log(getClass(),rs.getInt("MatchID") + " : " + rating);
+					i++;
+				}
+			}
+
+			if (i > 0) {
+				starsStatistics[2] = (starsStatistics[2] / i);
+			}
+			starsStatistics[3] = i;
+			//HOLogger.instance().log(getClass(),"Ratings Pos : " + i + " - " + bewertungen[0] + " / " + bewertungen[1] + " / " + bewertungen[2] + " / / " + bewertungen[3]);
+		} catch (Exception e) {
+			HOLogger.instance().log(getClass(), "DatenbankZugriff.getPlayerRatingForPosition : " + e);
+		}
+		return starsStatistics;
+	}
+
+	void storeMatchLineupPlayers(List<MatchLineupPosition> matchLineupPositions, MatchType matchType, int matchID, int teamID) {
+		if (matchLineupPositions != null) {
+			executePreparedDelete(matchID, matchType.getId(), teamID);
+			for ( var p : matchLineupPositions){
+				if ( p.getPlayerId() > 0 ) {
+					p.setMatchId(matchID);
+					p.setMatchType(matchType);
+					p.setTeamId(teamID);
+					p.setIsStored(false);    // replace (if record was available in database, it has to be deleted before storing)
+					store(p);
+				}
+			}
+		}
+	}
+
+	List<MatchLineupPosition> getMatchLineupPlayers(int matchID, MatchType matchType, int teamID)  {
+		return load(MatchLineupPosition.class, matchID, matchType.getId(), teamID);
+	}
+
+	public List<MatchLineupPosition> getMatchInserts(int objectPlayerID) {
+		return load(MatchLineupPosition.class, connectionManager.executePreparedQuery(createSelectStatement("*", " WHERE SpielerID = ?"), objectPlayerID));
+	}
+
+	public List<MatchLineupPosition> loadTopFlopRatings( List<Paarung> matches, int position, int count, boolean isBest){
+		var args = new ArrayList<>();
+		var sql = new StringBuilder("SELECT * FROM ");
+		sql.append(TABLENAME).append(" WHERE SpielerID != 0 AND RATING>0 AND RoleID IN (");
+
+		switch (position) {
+			case IMatchRoleID.KEEPER -> {
+				args.add(keeper);
+				sql.append("?)");
+			}
+			case IMatchRoleID.CENTRAL_DEFENDER -> {
+				args.add(leftCentralDefender);
+				args.add(middleCentralDefender);
+				args.add(rightCentralDefender);
+				sql.append("?,?,?)");
+			}
+			case IMatchRoleID.BACK -> {
+				args.add(leftBack);
+				sql.append("?)");
+			}
+			case IMatchRoleID.WINGER -> {
+				args.add(leftWinger);
+				args.add(rightWinger);
+				sql.append("?,?)");
+			}
+			case IMatchRoleID.MIDFIELDER -> {
+				args.add(leftInnerMidfield);
+				args.add(centralInnerMidfield);
+				args.add(rightInnerMidfield);
+				sql.append("?,?,?)");
+			}
+			case IMatchRoleID.FORWARD -> {
+				args.add(leftForward);
+				args.add(centralForward);
+				args.add(rightForward);
+				sql.append("?,?,?)");
+			}
+		}
+
+		if (!matches.isEmpty()) {
+			sql.append(" AND MatchID IN ");
+			var sep = '(';
+			for (Paarung match : matches) {
+				args.add(match.getMatchId());
+				sql.append(sep).append('?');
+				sep = ',';
+			}
+			sql.append(')');
+		}
+		sql.append(" ORDER BY RATING ");
+
+		if (isBest) {
+			sql.append("DESC");
+		} else {
+			sql.append("ASC");
+		}
+		sql.append(" LIMIT ").append(count);
+		return load(MatchLineupPosition.class, connectionManager.executePreparedQuery(sql.toString(), args.toArray()));
+	}
+}

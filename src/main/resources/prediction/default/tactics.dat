@@ -1,0 +1,26 @@
+[general]
+delta                = 0.000000 # fixed
+extraMulti           = 1.000000 # fixed
+squareMod            = 0.000000 # fixed
+cubeMod              = 0.000000 # fixed
+
+[aim_aow]
+postMulti            = 0.194912 # err=0.001890
+squareMod            = 0.009067 # err=0.001452
+cubeMod              = -0.000351 # err=0.000020
+
+[counter]
+multiPs              = 0.23
+multiDe              = 0.115
+
+[pressing]
+multiDe              = 0.085
+postDelta            = 0.075
+
+
+[longshots]
+multiSc            = 0.166666666666667
+multiSp            = 0.0555555555555556
+postDelta          = -7.6
+
+
